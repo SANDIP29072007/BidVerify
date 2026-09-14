@@ -289,6 +289,7 @@ class AuthService:
                 detail="Email address and password are required."
             )
 
+        user = None
         sp_user_id = None
         sp_authenticated = False
         
