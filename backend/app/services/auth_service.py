@@ -321,7 +321,13 @@ class AuthService:
                         if "confirm" in err_desc:
                             create_audit_record(db=db, action="USER_LOGIN_FAILED", new_value=f"Unconfirmed email login attempt: {clean_email}", ip_address=ip_address)
                             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email confirmation required before signing in.")
-                        elif "invalid" in err_desc or "credentials" in err_desc:
+
+                        # Fallback to local database bcrypt check before throwing 401
+                        user_local = db.query(User).filter(func.lower(User.email) == clean_email).first()
+                        if user_local and user_local.password_hash and verify_password(req.password, user_local.password_hash):
+                            sp_authenticated = True
+                            user = user_local
+                        else:
                             create_audit_record(db=db, action="USER_LOGIN_FAILED", new_value=f"Invalid credentials for: {clean_email}", ip_address=ip_address)
                             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password.")
                 except HTTPException:
@@ -330,7 +336,9 @@ class AuthService:
                     logger.warning(f"Supabase Auth connection note during login: {ex}")
 
         # 2. Fallback to local user lookup & bcrypt validation if Supabase didn't authenticate
-        user = db.query(User).filter(func.lower(User.email) == clean_email).first()
+        if not user:
+            user = db.query(User).filter(func.lower(User.email) == clean_email).first()
+
         if sp_user_id and not user:
             try:
                 user = db.query(User).filter(User.id == uuid.UUID(sp_user_id)).first()
