@@ -24,8 +24,16 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     clean_hash = hashed_password.strip()
     try:
         if clean_hash.startswith("$2"):
-            return bcrypt.checkpw(clean_pass.encode("utf-8"), clean_hash.encode("utf-8"))
-        return pwd_context.verify(clean_pass, clean_hash)
+            if bcrypt.checkpw(clean_pass.encode("utf-8"), clean_hash.encode("utf-8")):
+                return True
+            stripped_pass = _prepare_password(plain_password.strip())
+            if stripped_pass != clean_pass and bcrypt.checkpw(stripped_pass.encode("utf-8"), clean_hash.encode("utf-8")):
+                return True
+            return False
+        res = pwd_context.verify(clean_pass, clean_hash)
+        if not res and plain_password.strip() != plain_password:
+            res = pwd_context.verify(plain_password.strip(), clean_hash)
+        return res
     except Exception:
         try:
             return pwd_context.verify(clean_pass, clean_hash)

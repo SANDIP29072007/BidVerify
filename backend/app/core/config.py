@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = Field(default="http://localhost:3000,http://localhost:5173,http://localhost:5174,http://127.0.0.1:3000,http://127.0.0.1:5173,http://127.0.0.1:5174,https://bidverify.vercel.app,https://bidverify-blue.vercel.app,https://api-bidverify.vercel.app")
     SUPABASE_URL: str = Field(default="https://tmjcxhkrfqwmxtspyjwo.supabase.co")
     SUPABASE_PUBLISHABLE_KEY: str = Field(default="sb_publishable_pc8znb6TjFvk9CmVS8fJSg_Jk6wczcL")
-    SUPABASE_SECRET_KEY: str = Field(default="", repr=False)
+    SUPABASE_SECRET_KEY: str = Field(default="", validation_alias=AliasChoices("SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_KEY"), repr=False)
     SUPABASE_JWKS_URL: str = Field(default="https://tmjcxhkrfqwmxtspyjwo.supabase.co/auth/v1/.well-known/jwks.json")
     SUPABASE_BUCKET: str = Field(default="bid-documents")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=60)

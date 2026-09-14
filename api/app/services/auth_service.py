@@ -232,6 +232,21 @@ class AuthService:
                 if sp_res.status_code in [200, 201]:
                     sp_data = sp_res.json()
                     auth_uuid = sp_data.get("id")
+                elif sp_res.status_code in [400, 422]:
+                    get_res = requests.get(
+                        f"{settings.SUPABASE_URL.rstrip('/')}/auth/v1/admin/users",
+                        headers={
+                            "apikey": settings.SUPABASE_SECRET_KEY,
+                            "Authorization": f"Bearer {settings.SUPABASE_SECRET_KEY}"
+                        },
+                        timeout=5
+                    )
+                    if get_res.status_code == 200:
+                        users_list = get_res.json().get("users", [])
+                        for u in users_list:
+                            if u.get("email", "").lower() == clean_email:
+                                auth_uuid = u.get("id")
+                                break
             except Exception as e:
                 logger.warning(f"Supabase auth user creation note: {e}")
 
