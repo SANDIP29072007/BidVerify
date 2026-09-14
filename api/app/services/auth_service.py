@@ -113,13 +113,47 @@ class AuthService:
                 detail="A user with this email address already exists."
             )
 
+        clean_email = req.email.strip().lower()
+        # Supabase Auth user creation if configured
+        auth_uuid = None
+        if settings.SUPABASE_URL and settings.SUPABASE_SECRET_KEY and not settings.SUPABASE_URL.startswith("https://your-project"):
+            try:
+                import requests
+                sp_res = requests.post(
+                    f"{settings.SUPABASE_URL.rstrip('/')}/auth/v1/admin/users",
+                    headers={
+                        "apikey": settings.SUPABASE_SECRET_KEY,
+                        "Authorization": f"Bearer {settings.SUPABASE_SECRET_KEY}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "email": clean_email,
+                        "password": req.password,
+                        "email_confirm": True,
+                        "user_metadata": {
+                            "full_name": req.full_name,
+                            "role": user_role
+                        }
+                    },
+                    timeout=5
+                )
+                if sp_res.status_code in [200, 201]:
+                    sp_data = sp_res.json()
+                    auth_uuid = sp_data.get("id")
+            except Exception as e:
+                logger.warning(f"Supabase auth user creation note: {e}")
+
+        user_id_val = uuid.UUID(auth_uuid) if auth_uuid else uuid.uuid4()
+
         # Create user
         new_user = User(
+            id=user_id_val,
             full_name=req.full_name,
-            email=req.email.strip().lower(),
+            email=clean_email,
             password_hash=get_password_hash(req.password),
             role=user_role,
-            is_active=True
+            is_active=True,
+            auth_user_id=auth_uuid
         )
         db.add(new_user)
         db.commit()
@@ -171,7 +205,7 @@ class AuthService:
 
         perms_str = json.dumps(req.permissions or []) if isinstance(req.permissions, list) else str(req.permissions or "")
 
-        # Optional Supabase Auth user creation if configured
+        # Supabase Auth user creation if configured
         auth_uuid = None
         if settings.SUPABASE_URL and settings.SUPABASE_SECRET_KEY and not settings.SUPABASE_URL.startswith("https://your-project"):
             try:
@@ -201,7 +235,10 @@ class AuthService:
             except Exception as e:
                 logger.warning(f"Supabase auth user creation note: {e}")
 
+        user_id_val = uuid.UUID(auth_uuid) if auth_uuid else uuid.uuid4()
+
         new_user = User(
+            id=user_id_val,
             full_name=req.full_name,
             email=clean_email,
             phone=req.phone,

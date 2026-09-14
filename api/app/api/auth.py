@@ -23,12 +23,17 @@ from app.core.security import get_password_hash, verify_password
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def register(req: UserRegister, request: Request, db: Session = Depends(get_db)):
     """Register a new user (public registration allows BIDDER only)."""
     ip_address = request.client.host if request.client else None
     user = AuthService.register_user(db, req, ip_address)
-    return user
+    access_token = create_access_token(subject=str(user.id), role=user.role)
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": user
+    }
 
 @router.post("/login", response_model=TokenResponse)
 async def login(request: Request, db: Session = Depends(get_db)):

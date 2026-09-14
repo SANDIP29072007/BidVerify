@@ -272,17 +272,38 @@ function Login({ onLogin, onDemo, initialIsSignUp = false, onBackToHome, onNavig
       const data = await safeJson(response);
 
       if (!response.ok || !data || data.success === false) {
-        throw new Error(data?.detail || data?.message || "Registration failed.");
+        const errMsg = data?.detail || data?.message || "Registration failed.";
+        if (errMsg.toLowerCase().includes("already exists")) {
+          setAuthError("An account with this email address already exists. Switching to Sign In...");
+          setTimeout(() => {
+            setLoginEmail(cleanSignUpEmail);
+            setPassword(signUpPassword);
+            setSelectedPortal("Supplier");
+            setIsSignUp(false);
+            setAuthError("Account already exists. Please sign in with your credentials.");
+            generateCaptcha();
+          }, 1500);
+          return;
+        }
+        throw new Error(errMsg);
       }
 
-      setSuccessMsg("Registration successful! Directing to login.");
-      setTimeout(() => {
-        setLoginEmail(cleanSignUpEmail);
-        setSelectedPortal("Supplier");
-        setIsSignUp(false);
-        setSuccessMsg("");
-        generateCaptcha();
-      }, 1500);
+      if (data && data.access_token && data.user) {
+        setSuccessMsg(`Registration successful! Welcome, ${data.user.full_name || 'Bidder'}. Directing to workspace...`);
+        setTimeout(() => {
+          onLogin(data.access_token, data.user);
+        }, 1200);
+      } else {
+        setSuccessMsg("Registration successful! Pre-filling credentials for sign in...");
+        setTimeout(() => {
+          setLoginEmail(cleanSignUpEmail);
+          setPassword(signUpPassword);
+          setSelectedPortal("Supplier");
+          setIsSignUp(false);
+          setSuccessMsg("Account created successfully. Enter security code and click Login.");
+          generateCaptcha();
+        }, 1200);
+      }
 
     } catch (err) {
       setAuthError(err.message || "Failed to register account.");
