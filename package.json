@@ -11,5 +11,8 @@
   },
   "dependencies": {
     "@supabase/server": "^1.6.0"
+  },
+  "devDependencies": {
+    "vite": "6.2.0"
   }
 }
