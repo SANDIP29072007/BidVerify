@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     INITIAL_ADMIN_PASSWORD: str = Field(default="", repr=False)
     JWT_ALGORITHM: str = Field(default="HS256")
     UPLOAD_DIR: str = Field(default_factory=_get_default_upload_dir)
-    CORS_ORIGINS: str = Field(default="http://localhost:3000,http://localhost:5173,http://localhost:5174,http://127.0.0.1:3000,http://127.0.0.1:5173,http://127.0.0.1:5174,https://bidverify.vercel.app,https://bidverify-blue.vercel.app,https://api-bidverify.vercel.app")
+    CORS_ORIGINS: str = Field(default="http://localhost:3000,http://localhost:5173,http://localhost:5174,http://127.0.0.1:3000,http://127.0.0.1:5173,http://127.0.0.1:5174,https://bidverify.vercel.app,https://bidverify-blue.vercel.app,https://api-bidverify.vercel.app,https://frontend.example.com")
     SUPABASE_URL: str = Field(default="https://tmjcxhkrfqwmxtspyjwo.supabase.co")
     SUPABASE_PUBLISHABLE_KEY: str = Field(default="sb_publishable_pc8znb6TjFvk9CmVS8fJSg_Jk6wczcL")
     SUPABASE_SECRET_KEY: str = Field(default="", validation_alias=AliasChoices("SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_KEY"), repr=False)

@@ -113,6 +113,13 @@ def apply_schema_migrations():
                     except Exception as e:
                         logger.warning(f"Failed to add column {col_name} to users: {e}")
 
+            if engine.dialect.name != "sqlite":
+                try:
+                    with engine.begin() as ddl_conn:
+                        ddl_conn.execute(text("ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL"))
+                except Exception as e:
+                    logger.warning(f"Note on password_hash drop not null constraint: {e}")
+
         if "audit_logs" in inspector.get_table_names():
             existing_audit_cols = [c["name"] for c in inspector.get_columns("audit_logs")]
             if "blockchain_hash" not in existing_audit_cols:
@@ -269,8 +276,10 @@ def initialize_database():
 
     try:
         apply_schema_migrations()
-        init_admin_user()
-        seed_initial_tenders()
+        # Seeding of sample/demo data is prohibited in production
+        if not is_prod and getattr(settings, "ALLOW_SEED", False):
+            init_admin_user()
+            seed_initial_tenders()
     except Exception as exc:
         logger.warning(f"Database schema initialization check warning: {exc}")
 

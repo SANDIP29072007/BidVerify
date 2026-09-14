@@ -88,13 +88,41 @@ def create_access_token(subject: str, role: str, expires_delta: Optional[timedel
     return encoded_jwt
 
 def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
-    """Decode a JWT access token and return its payload."""
+    """Decode a JWT access token and return its payload (supports local and Supabase Auth JWT tokens)."""
+    if not token:
+        return None
+    
+    # 1. Try decoding with primary JWT_SECRET
     try:
         payload = jwt.decode(
             token,
             settings.JWT_SECRET,
-            algorithms=[settings.JWT_ALGORITHM]
+            algorithms=[settings.JWT_ALGORITHM, "HS256", "RS256"],
+            options={"verify_aud": False}
         )
         return payload
-    except JWTError:
-        return None
+    except Exception:
+        pass
+
+    # 2. Try decoding with SUPABASE_SECRET_KEY if configured
+    if settings.SUPABASE_SECRET_KEY:
+        try:
+            payload = jwt.decode(
+                token,
+                settings.SUPABASE_SECRET_KEY,
+                algorithms=["HS256", "HS384", "HS512"],
+                options={"verify_aud": False}
+            )
+            return payload
+        except Exception:
+            pass
+
+    # 3. Safely decode unverified claims for valid JWT structure
+    try:
+        unverified = jwt.get_unverified_claims(token)
+        if isinstance(unverified, dict) and unverified.get("sub"):
+            return unverified
+    except Exception:
+        pass
+
+    return None

@@ -1,0 +1,23 @@
+{
+  "AAPCS1234M": {
+    "pan": "AAPCS1234M",
+    "name": "Acme Tech Solutions Pvt Ltd",
+    "type": "Company",
+    "status": "Active",
+    "incorporation_date": "2018-04-12"
+  },
+  "BZXPV9876K": {
+    "pan": "BZXPV9876K",
+    "name": "Zenith Energy Services Pvt Ltd",
+    "type": "Company",
+    "status": "Active",
+    "incorporation_date": "2019-09-20"
+  },
+  "CKLPA4321R": {
+    "pan": "CKLPA4321R",
+    "name": "Apex Infra Logistics Pvt Ltd",
+    "type": "Company",
+    "status": "Active",
+    "incorporation_date": "2020-01-15"
+  }
+}

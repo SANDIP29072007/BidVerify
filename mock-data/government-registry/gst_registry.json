@@ -1,0 +1,26 @@
+{
+  "27AAPCS1234M1Z5": {
+    "gstin": "27AAPCS1234M1Z5",
+    "legal_name": "Acme Tech Solutions Pvt Ltd",
+    "trade_name": "Acme Tech",
+    "state": "Maharashtra",
+    "status": "Active",
+    "taxpayer_type": "Regular"
+  },
+  "07BZXPV9876K1Z9": {
+    "gstin": "07BZXPV9876K1Z9",
+    "legal_name": "Zenith Energy Solutions Ltd",
+    "trade_name": "Zenith Energy",
+    "state": "Delhi",
+    "status": "Active",
+    "taxpayer_type": "Regular"
+  },
+  "33CKLPA4321R1Z2": {
+    "gstin": "33CKLPA4321R1Z2",
+    "legal_name": "Apex Infra Logistics Pvt Ltd",
+    "trade_name": "Apex Logistics",
+    "state": "Tamil Nadu",
+    "status": "Active",
+    "taxpayer_type": "Regular"
+  }
+}

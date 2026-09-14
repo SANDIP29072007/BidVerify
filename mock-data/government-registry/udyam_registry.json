@@ -1,0 +1,23 @@
+{
+  "UDYAM-MH-12-0012345": {
+    "udyam_number": "UDYAM-MH-12-0012345",
+    "enterprise_name": "Acme Tech Solutions Pvt Ltd",
+    "enterprise_type": "Small",
+    "major_activity": "Services",
+    "status": "Active"
+  },
+  "UDYAM-DL-07-0098765": {
+    "udyam_number": "UDYAM-DL-07-0098765",
+    "enterprise_name": "Zenith Energy Services Pvt Ltd",
+    "enterprise_type": "Medium",
+    "major_activity": "Services",
+    "status": "Active"
+  },
+  "UDYAM-TN-33-0043210": {
+    "udyam_number": "UDYAM-TN-33-0043210",
+    "enterprise_name": "Apex Infra Logistics Pvt Ltd",
+    "enterprise_type": "Small",
+    "major_activity": "Manufacturing",
+    "status": "Active"
+  }
+}

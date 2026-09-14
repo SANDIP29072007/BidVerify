@@ -1,0 +1,10 @@
+{
+  "blacklisted_entities": [
+    {
+      "pan": "BLKPN9999X",
+      "company": "Fraudulent Infra Ltd",
+      "reason": "Debarred for bid manipulation",
+      "debarred_until": "2029-12-31"
+    }
+  ]
+}

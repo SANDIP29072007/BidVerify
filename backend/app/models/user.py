@@ -10,7 +10,7 @@ class User(Base):
     full_name = Column(String(100), nullable=False)
     email = Column(String(100), unique=True, nullable=False, index=True)
     phone = Column(String(20), nullable=True)
-    password_hash = Column(String(255), nullable=False)
+    password_hash = Column(String(255), nullable=True)
     role = Column(String(50), nullable=False, default="BIDDER")  # "BIDDER", "OFFICER", "ADMIN"
     department = Column(String(100), nullable=True, default="Procurement")
     status = Column(String(20), nullable=False, default="Active")  # "Active", "Pending", "Suspended"

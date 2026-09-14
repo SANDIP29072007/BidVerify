@@ -281,25 +281,83 @@ class AuthService:
 
     @staticmethod
     def authenticate_user(db: Session, req: UserLogin, ip_address: Optional[str] = None) -> User:
-        """Authenticate user credentials and return User model."""
+        """Authenticate user credentials using Supabase Auth as authoritative identity source."""
         clean_email = (req.email or "").strip().lower()
-        user = db.query(User).filter(func.lower(User.email) == clean_email).first()
-        
-        is_valid_pass = False
-        if user:
-            is_valid_pass = verify_password(req.password, user.password_hash)
-
-        if not user or not is_valid_pass:
-            create_audit_record(
-                db=db,
-                action="USER_LOGIN_FAILED",
-                new_value=f"Failed login attempt for: {req.email}",
-                ip_address=ip_address
-            )
+        if not clean_email or not req.password:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect email or password."
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email address and password are required."
             )
+
+        sp_user_id = None
+        sp_authenticated = False
+        
+        # 1. Attempt Supabase Auth password authentication if configured
+        if settings.SUPABASE_URL and not settings.SUPABASE_URL.startswith("https://your-project"):
+            supa_key = settings.SUPABASE_PUBLISHABLE_KEY or settings.SUPABASE_SECRET_KEY
+            if supa_key:
+                try:
+                    import requests
+                    sp_res = requests.post(
+                        f"{settings.SUPABASE_URL.rstrip('/')}/auth/v1/token?grant_type=password",
+                        headers={
+                            "apikey": supa_key,
+                            "Content-Type": "application/json"
+                        },
+                        json={
+                            "email": clean_email,
+                            "password": req.password
+                        },
+                        timeout=5
+                    )
+                    if sp_res.status_code == 200:
+                        sp_data = sp_res.json()
+                        sp_user_id = sp_data.get("user", {}).get("id")
+                        sp_authenticated = True
+                    elif sp_res.status_code in (400, 401):
+                        err_body = sp_res.json() if sp_res.headers.get("content-type", "").startswith("application/json") else {}
+                        err_desc = (err_body.get("error_description") or err_body.get("msg") or "").lower()
+                        
+                        if "confirm" in err_desc:
+                            create_audit_record(db=db, action="USER_LOGIN_FAILED", new_value=f"Unconfirmed email login attempt: {clean_email}", ip_address=ip_address)
+                            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email confirmation required before signing in.")
+                        elif "invalid" in err_desc or "credentials" in err_desc:
+                            create_audit_record(db=db, action="USER_LOGIN_FAILED", new_value=f"Invalid credentials for: {clean_email}", ip_address=ip_address)
+                            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password.")
+                except HTTPException:
+                    raise
+                except Exception as ex:
+                    logger.warning(f"Supabase Auth connection note during login: {ex}")
+
+        # 2. Fallback to local user lookup & bcrypt validation if Supabase didn't authenticate
+        user = db.query(User).filter(func.lower(User.email) == clean_email).first()
+        if sp_user_id and not user:
+            try:
+                user = db.query(User).filter(User.id == uuid.UUID(sp_user_id)).first()
+            except Exception:
+                pass
+
+        if not sp_authenticated:
+            is_valid_pass = False
+            if user and user.password_hash:
+                is_valid_pass = verify_password(req.password, user.password_hash)
+
+            if not user or not is_valid_pass:
+                create_audit_record(
+                    db=db,
+                    action="USER_LOGIN_FAILED",
+                    new_value=f"Failed login attempt for: {req.email}",
+                    ip_address=ip_address
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Incorrect email or password."
+                )
+
+        # 3. Check profile status
+        if not user:
+            create_audit_record(db=db, action="USER_LOGIN_FAILED", new_value=f"Missing application profile for authenticated user: {clean_email}", ip_address=ip_address)
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User account profile not found.")
 
         if user.status == "Suspended" or not user.is_active:
             create_audit_record(
@@ -313,6 +371,9 @@ class AuthService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="User account is inactive or suspended. Please contact the administrator."
             )
+
+        if sp_user_id and not user.auth_user_id:
+            user.auth_user_id = sp_user_id
 
         user.last_login = datetime.now(timezone.utc)
         db.commit()
@@ -425,8 +486,8 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
         )
     
     user_id = payload.get("sub")
-    role = (payload.get("role") or "").upper()
-    if not user_id:
+    email = payload.get("email") or payload.get("user_metadata", {}).get("email")
+    if not user_id and not email:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token payload is invalid.",
@@ -434,48 +495,36 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
         )
 
     user = None
-    try:
-        user_uuid = uuid.UUID(str(user_id))
-        user = db.query(User).filter(User.id == user_uuid).first()
-        if not user:
-            # Fallback search by string representation or email
-            all_users = db.query(User).all()
-            for u in all_users:
-                if str(u.id) == str(user_id) or str(u.id) == str(user_uuid):
-                    user = u
-                    break
-    except Exception as ex:
-        logger.warning(f"Error decoding user_uuid: {ex}")
-
-    if not user:
-        clean_user_id = str(user_id).strip().lower()
-        user = db.query(User).filter(func.lower(func.trim(User.email)) == clean_user_id).first()
-
-    if not user and role == "ADMIN":
-        user = db.query(User).filter(User.role == "ADMIN", User.is_active == True).first()
-
-    if not user and role:
-        user = db.query(User).filter(func.upper(User.role) == role, User.is_active == True).first()
-
-    if not user:
+    if user_id:
         try:
-            from app.db.database import init_admin_user
-            init_admin_user()
-            user = db.query(User).filter(User.role == "ADMIN").first()
+            user_uuid = uuid.UUID(str(user_id))
+            user = db.query(User).filter((User.id == user_uuid) | (User.auth_user_id == str(user_id))).first()
         except Exception:
             pass
 
+    if not user and user_id:
+        user = db.query(User).filter(User.auth_user_id == str(user_id)).first()
+
+    if not user and email:
+        clean_email = str(email).strip().lower()
+        user = db.query(User).filter(func.lower(func.trim(User.email)) == clean_email).first()
+
+    if not user and user_id:
+        clean_sub = str(user_id).strip().lower()
+        if "@" in clean_sub:
+            user = db.query(User).filter(func.lower(func.trim(User.email)) == clean_sub).first()
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found.",
+            detail="User account profile not found.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    if not user.is_active:
+    if not user.is_active or user.status == "Suspended":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User account is inactive.",
+            detail="User account is inactive or suspended.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
