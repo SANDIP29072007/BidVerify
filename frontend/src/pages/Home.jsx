@@ -4868,18 +4868,28 @@ const UserManagementView = ({ user, role, isAdmin, API_BASE, token }) => {
         });
         if (res.ok) {
           const data = await res.json();
-          const mapped = data.map(u => ({
-            id: u.id,
-            name: u.full_name || u.email.split("@")[0],
-            email: u.email,
-            phone: u.phone || "N/A",
-            role: u.role === "ADMIN" ? "Super Admin" : u.role === "OFFICER" ? "Procurement Officer" : u.role,
-            department: u.department || "Procurement",
-            status: u.status || (u.is_active ? "Active" : "Suspended"),
-            lastLogin: u.last_login ? new Date(u.last_login).toLocaleString("en-IN") : "Never logged in",
-            permissions: u.permissions ? (typeof u.permissions === "string" ? (u.permissions.startsWith("[") ? JSON.parse(u.permissions) : u.permissions.split(",")) : u.permissions) : ["Manage Tenders", "Verify Documents", "View Reports"]
-          }));
-          setUsersList(prev => (JSON.stringify(prev) === JSON.stringify(mapped) ? prev : mapped));
+          const mapped = data.map(u => {
+            const rawRole = (u.role || "").toUpperCase();
+            let displayRole = u.role;
+            if (rawRole === "ADMIN" || rawRole === "SUPER ADMIN") displayRole = "Super Admin";
+            else if (rawRole === "OFFICER" || rawRole === "PROCUREMENT OFFICER") displayRole = "Procurement Officer";
+            else if (rawRole === "VERIFICATION OFFICER") displayRole = "Verification Officer";
+            else if (rawRole === "AUDITOR") displayRole = "Auditor";
+            else if (rawRole === "BIDDER" || rawRole === "SUPPLIER") displayRole = "Bidder (Supplier)";
+
+            return {
+              id: u.id,
+              name: u.full_name || u.email.split("@")[0],
+              email: u.email,
+              phone: u.phone || "N/A",
+              role: displayRole,
+              department: u.department || (rawRole === "BIDDER" ? "External Supplier" : "Procurement"),
+              status: u.status || (u.is_active ? "Active" : "Suspended"),
+              lastLogin: u.last_login ? new Date(u.last_login).toLocaleString("en-IN") : "Never logged in",
+              permissions: u.permissions ? (typeof u.permissions === "string" ? (u.permissions.startsWith("[") ? JSON.parse(u.permissions) : u.permissions.split(",")) : u.permissions) : ["Manage Tenders", "Verify Documents", "View Reports"]
+            };
+          });
+          setUsersList(mapped);
         }
       } catch (err) {
         console.warn("Failed to fetch admin users list:", err);
@@ -5087,7 +5097,7 @@ const UserManagementView = ({ user, role, isAdmin, API_BASE, token }) => {
 
           if (res.ok) {
             alert(`User account created successfully.`);
-            fetchUsersList();
+            await fetchUsersList(false);
             setIsAddEditModalOpen(false);
           } else {
             const errData = await res.json();
@@ -5240,6 +5250,10 @@ const UserManagementView = ({ user, role, isAdmin, API_BASE, token }) => {
           return <span style={{ background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0", padding: "4px 10px", borderRadius: "6px", fontSize: "0.78rem", fontWeight: 700 }}>Verification Officer</span>;
         case "Auditor":
           return <span style={{ background: "#f1f5f9", color: "#475569", border: "1px solid #cbd5e1", padding: "4px 10px", borderRadius: "6px", fontSize: "0.78rem", fontWeight: 700 }}>Auditor</span>;
+        case "Bidder (Supplier)":
+        case "BIDDER":
+        case "Supplier":
+          return <span style={{ background: "#fff7ed", color: "#c2410c", border: "1px solid #ffedd5", padding: "4px 10px", borderRadius: "6px", fontSize: "0.78rem", fontWeight: 700 }}>Bidder (Supplier)</span>;
         default:
           return <span style={{ background: "#f8fafc", color: "#64748b", border: "1px solid #e2e8f0", padding: "4px 10px", borderRadius: "6px", fontSize: "0.78rem" }}>{r}</span>;
       }
@@ -5382,6 +5396,7 @@ const UserManagementView = ({ user, role, isAdmin, API_BASE, token }) => {
               <option value="Procurement Officer" style={{ background: "#ffffff", color: "#0f172a" }}>Procurement Officer</option>
               <option value="Verification Officer" style={{ background: "#ffffff", color: "#0f172a" }}>Verification Officer</option>
               <option value="Auditor" style={{ background: "#ffffff", color: "#0f172a" }}>Auditor</option>
+              <option value="Bidder (Supplier)" style={{ background: "#ffffff", color: "#0f172a" }}>Bidder (Supplier)</option>
             </select>
 
             {/* Department Filter */}
