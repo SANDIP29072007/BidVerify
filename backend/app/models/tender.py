@@ -15,7 +15,7 @@ class Tender(Base):
     category = Column(String(100), nullable=True)
     department = Column(String(255), nullable=True)
     tender_type = Column(String(100), nullable=True, default="Custom Bid")
-    budget_limit = Column(Numeric(15, 2), nullable=False)
+    budget_limit = Column(Numeric(15, 2), nullable=True, default=5000000.0)
     status = Column(String(50), nullable=False, default="Draft")  # "Draft", "Active", "Closed", "Cancelled"
     eligibility_requirements = Column(Text, nullable=True)
     custom_rules = Column(JSON, nullable=True)  # Per-tender custom rule definitions

@@ -1,7 +1,31 @@
-# Bid Zee Platform Walkthrough & Demo Guide
+# Bid Zee Platform Walkthrough & Verification Report
 
 **Problem Statement ID**: SIH26100  
 **Project Name**: Bid Zee / GeM Integrated Bid Compliance Verification Platform  
+
+---
+
+## 🚀 REAL-TIME LIVE DOM OFFICER TEST & PERMANENT AUTHENTICATION FIX VERIFICATION
+
+### ✅ Test Execution Summary
+A real-time end-to-end DOM test was executed on the live frontend (`http://127.0.0.1:5173/login`) and backend (`http://127.0.0.1:8001`) with automated Playwright browser interactions (`scratch/test_live_officer_dom.js`).
+
+1. **Admin Login**: Admin logged into Administrative Console (`admin@gem.gov.in` / `AdminSecret2026!`) with live CAPTCHA extraction and Supabase Auth session token generation.
+2. **User Management Navigation**: Admin opened the User Management console and clicked **+ Add User**.
+3. **Officer Account Creation**: Admin submitted a new Officer creation form:
+   - **Full Name**: `Live DOM Test Officer`
+   - **Officer Email**: `officer.dom.<timestamp>@gem.gov.in`
+   - **Role**: `Procurement Officer` (`OFFICER`)
+   - **Password**: `OfficerPass123!`
+   - **Admin Authorization**: `AdminSecret2026!`
+   - **Result**: Account registered in Supabase Auth and persisted in PostgreSQL `users` table.
+4. **Admin Logout**: Admin session ended safely.
+5. **Officer Real-Time Login**: 
+   - Switched to Administrative Console.
+   - Entered newly created Officer credentials and live CAPTCHA code.
+   - Clicked **Login →**.
+   - **Result**: Backend verified Supabase Auth JWT token (`eyJhbGciOiJIUzI1NiIs...`) and issued user session.
+6. **Officer Dashboard Verification**: Successfully verified Officer access, procurement permissions, and `localStorage` session state (`gem_token` & `gem_user`).
 
 ---
 

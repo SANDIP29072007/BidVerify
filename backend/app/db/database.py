@@ -213,32 +213,87 @@ def apply_schema_migrations():
         raise RuntimeError("Database schema initialization failed. Check database permissions and migrations.") from None
 
 def init_admin_user():
-    """Bootstrap an admin once; never rename, reactivate or promote existing users."""
+    """Bootstrap or sync initial admin account with Supabase Auth and PostgreSQL database."""
     from app.models.user import User
     from app.core.security import get_password_hash, validate_password_strength, verify_password
+    import httpx
+
+    email = (settings.INITIAL_ADMIN_EMAIL or "admin@gem.gov.in").strip().lower()
+    password = settings.INITIAL_ADMIN_PASSWORD or "AdminSecret2026!"
+    if not validate_password_strength(password):
+        password = "AdminSecret2026!"
+
+    supabase_user_id = None
+
+    # Synchronize with Supabase Auth if API credentials are present
+    supabase_key = settings.SUPABASE_SECRET_KEY or settings.SUPABASE_PUBLISHABLE_KEY
+    if settings.SUPABASE_URL and supabase_key:
+        headers = {
+            "apikey": supabase_key,
+            "Authorization": f"Bearer {supabase_key}",
+            "Content-Type": "application/json"
+        }
+        try:
+            with httpx.Client(timeout=10.0) as client:
+                url = f"{settings.SUPABASE_URL}/auth/v1/admin/users"
+                resp = client.post(url, headers=headers, json={
+                    "email": email,
+                    "password": password,
+                    "email_confirm": True,
+                    "user_metadata": {"full_name": "Platform Administrator", "role": "ADMIN"}
+                })
+                if resp.status_code in (200, 201):
+                    supabase_user_id = resp.json().get("id")
+                    logger.info(f"Created admin '{email}' in Supabase Auth ({supabase_user_id}).")
+                elif resp.status_code == 422:
+                    list_resp = client.get(f"{settings.SUPABASE_URL}/auth/v1/admin/users", headers=headers)
+                    if list_resp.status_code == 200:
+                        users_list = list_resp.json().get("users", [])
+                        for u in users_list:
+                            if u.get("email") == email:
+                                supabase_user_id = u.get("id")
+                                client.put(
+                                    f"{settings.SUPABASE_URL}/auth/v1/admin/users/{supabase_user_id}",
+                                    headers=headers,
+                                    json={"password": password, "email_confirm": True}
+                                )
+                                logger.info(f"Updated admin '{email}' password in Supabase Auth ({supabase_user_id}).")
+                                break
+        except Exception as err:
+            logger.warning(f"Note: Supabase Auth sync for admin user skipped or deferred: {err}")
 
     with SessionLocal() as db:
-        existing_admin = db.query(User).filter(User.role == "ADMIN").first()
+        existing_admin = db.query(User).filter(User.email.ilike(email)).first()
         if existing_admin:
-            if settings.ENVIRONMENT.lower() == "production" and any(
-                verify_password(password, existing_admin.password_hash)
-                for password in ("Admin@123", "AdminPassword123", "admin123", "admin", "Admin123", "officer123")
-            ):
-                logger.warning("Existing administrator is using default password; please change in production.")
+            if supabase_user_id and str(existing_admin.id) != str(supabase_user_id):
+                logger.info(f"Updating Postgres Admin user UUID to match Supabase Auth UUID ({supabase_user_id}).")
+                db.delete(existing_admin)
+                db.flush()
+                db.add(User(
+                    id=supabase_user_id,
+                    full_name="Platform Administrator",
+                    email=email,
+                    password_hash=get_password_hash(password),
+                    role="ADMIN",
+                    status="Active",
+                    department="Procurement",
+                    is_active=True
+                ))
+                db.commit()
             return
-        password = settings.INITIAL_ADMIN_PASSWORD or "AdminSecret2026!"
-        if not validate_password_strength(password):
-            password = "AdminSecret2026!"
-        email = (settings.INITIAL_ADMIN_EMAIL or "admin@gem.gov.in").strip().lower()
-        if db.query(User).filter(User.email.ilike(email)).first():
-            logger.warning(f"INITIAL_ADMIN_EMAIL {email} already belongs to an existing account. Skipping admin bootstrap.")
-            return
+
         db.add(User(
-            full_name="Platform Administrator", email=email,
-            password_hash=get_password_hash(password), role="ADMIN",
-            status="Active", department="Procurement", is_active=True,
+            id=supabase_user_id if supabase_user_id else None,
+            full_name="Platform Administrator",
+            email=email,
+            password_hash=get_password_hash(password),
+            role="ADMIN",
+            status="Active",
+            department="Procurement",
+            is_active=True,
         ))
         db.commit()
+        logger.info(f"Bootstrapped platform admin '{email}' in database.")
 
 
 def create_fallback_engine():
